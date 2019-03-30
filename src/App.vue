@@ -1,31 +1,89 @@
 <template>
   <div id="app">
-    <div id="nav">
-      <router-link to="/">Home</router-link> |
-      <router-link to="/about">About</router-link>
+    <div class="container">
+      <div class="navbar">
+        <div class="navbar__brand">
+          <router-link to="/">Vue Auth Box</router-link>
+        </div>
+        <ul class="navbar__list">
+          <li class="navbar__item"  v-if="guest">
+            <router-link to="/login">LOGIN</router-link>
+          </li>
+          <li class="navbar__item"  v-if="guest">
+            <router-link to="/register">REGISTER</router-link>
+          </li>
+          <li class="navbar__item"  v-if="auth">
+            <router-link to="">PROFILE</router-link>
+          </li>
+          <li class="navbar__item"  v-if="auth">
+            <a @click.stop="logout">LOGOUT</a>
+          </li>
+        </ul>
+      </div>
+      <div class="flash flash__error" v-if="flash.error">
+        {{flash.error}}
+      </div>
+      <div class="flash flash__success" v-if="flash.success">
+        {{flash.success}}
+      </div>
+      <router-view></router-view>
     </div>
-    <router-view/>
   </div>
 </template>
 
-<style>
-#app {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-}
-#nav {
-  padding: 30px;
-}
+<script type="text/javascript">
+    import Auth from './store/auth'
+    import Flash from './helpers/flash'
+    import { post, interceptors } from './helpers/api'
+    import constant from './helpers/constants'
+    export default {
+        created() {
+            // global error http handler
+            interceptors((err) => {
+                if(err.response.status === 401) {
+                    Auth.remove()
+                    this.$router.push('/login')
+                }
 
-#nav a {
-  font-weight: bold;
-  color: #2c3e50;
-}
+                if(err.response.status === 500) {
+                    Flash.setError(err.response.statusText)
+                }
 
-#nav a.router-link-exact-active {
-  color: #42b983;
-}
-</style>
+                if(err.response.status === 404) {
+                    this.$router.push('/not-found')
+                }
+            })
+            Auth.initialize()
+        },
+        data() {
+            return {
+                authState: Auth.state,
+                flash: Flash.state
+            }
+        },
+        computed: {
+            auth() {
+                if(this.authState.api_token) {
+                    return true
+                }
+                return false
+            },
+            guest() {
+                return !this.auth
+            }
+        },
+        methods: {
+            logout() {
+                post(constant.server_url + 'logout', { user_id: Auth.state.user_id })
+                    .then((res) => {
+                        if(res.data.done) {
+                            // remove token
+                            Auth.remove();
+                            Flash.setSuccess('You have successfully logged out.');
+                            this.$router.push('/login')
+                        }
+                    })
+            }
+        }
+    }
+</script>
